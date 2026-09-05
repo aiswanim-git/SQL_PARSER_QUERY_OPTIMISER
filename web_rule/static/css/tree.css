@@ -1,0 +1,141 @@
+.tree-container {
+    margin: 24px 0;
+    padding: 24px;
+    overflow: auto;
+    background: linear-gradient(180deg, #ffffff 0%, #f4f7ff 100%);
+    border-radius: 12px;
+    border: 1px solid #dde4ee;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+}
+
+#tree-view {
+    margin: 12px 0;
+    padding: 18px;
+    overflow: auto;
+    background: linear-gradient(180deg, #ffffff 0%, #f4f7ff 100%);
+    border-radius: 12px;
+    border: 1px solid #dde4ee;
+}
+
+.tree {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    margin: 0;
+    padding: 0;
+    color: #1f2937;
+}
+
+.tree li {
+    list-style: none;
+    margin: 12px 0;
+    position: relative;
+}
+
+.tree li::before {
+    content: "";
+    position: absolute;
+    top: -12px;
+    left: -22px;
+    width: 1px;
+    height: 100%;
+    background: #cfd8e3;
+}
+
+.tree li::after {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: -22px;
+    width: 22px;
+    height: 1px;
+    background: #cfd8e3;
+}
+
+.tree > li::before,
+.tree > li::after {
+    display: none;
+}
+
+.tree li:last-child::before {
+    height: 22px;
+}
+
+.tree ul {
+    padding-left: 34px;
+    margin-top: 6px;
+}
+
+.tree-node {
+    display: inline-block;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #e5eaf0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.tree-node-type {
+    font-weight: 600;
+    color: #2563eb;
+    letter-spacing: 0.3px;
+}
+
+.tree-node-detail {
+    margin-left: 6px;
+    color: #16a34a;
+}
+
+.tree-node-condition {
+    font-style: italic;
+    color: #16a34a;
+}
+
+.tree-column {
+    color: #16a34a;
+    font-weight: 500;
+}
+
+.tree-literal {
+    color: #7c3aed;
+}
+
+.tree-operator {
+    font-weight: 600;
+    color: #f97316;
+}
+
+.tree-table {
+    font-style: italic;
+    color: #16a34a;
+}
+
+.toggle-btn {
+    cursor: pointer;
+    margin-right: 6px;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    font-size: 13px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.toggle-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.collapsed > ul {
+    display: none;
+}
+
+.expanded > .toggle-btn::before {
+    content: "−";
+}
+
+.collapsed > .toggle-btn::before {
+    content: "+";
+}

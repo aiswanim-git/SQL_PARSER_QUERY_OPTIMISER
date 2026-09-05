@@ -1,1 +1,95 @@
+/* ===== Query Tree Graph Canvas ===== */
 
+#graph-view,
+.before-graph,
+.after-graph {
+    margin: 10px 0;
+    padding: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 200px;
+}
+
+.qt-graph-wrapper {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.qt-graph-wrapper svg {
+    display: block;
+    border-radius: 12px;
+    cursor: default;
+}
+
+.qt-legend {
+    margin-top: 8px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 8px 12px;
+    background: rgba(15, 23, 42, 0.06);
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+/* ===== Plan comparison pair (pushdown / join / cse) ===== */
+
+.plan-pair-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ===== Graph Image (graphviz backend) ===== */
+
+.graph-image-container {
+    max-height: 520px;
+    background: #ffffff;
+    border: 1px solid #d0d7e2;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    overflow: auto;
+    padding: 12px;
+    text-align: center;
+}
+
+.plan-image {
+    max-width: 100%;
+    height: auto;
+    display: inline-block;
+}
+
+/* ===== Common Expressions section ===== */
+
+#common-expressions-section {
+    margin-top: 22px;
+    background: #ffffff;
+    border: 1px solid #d0d7e2;
+    border-radius: 10px;
+    padding: 18px;
+}
+
+#common-expressions-section h5 {
+    margin-bottom: 14px;
+    color: #1f2937;
+    font-weight: 600;
+}
+
+#common-expressions-list .list-group-item {
+    margin-bottom: 12px;
+    background: #f9fbff;
+    border: 1px solid #e5eaf2;
+    border-radius: 8px;
+    padding: 14px;
+}
+
+#common-expressions-list pre {
+    font-size: 0.85rem;
+    background: #f4f6fa;
+    border: 1px solid #e1e5ec;
+    border-radius: 6px;
+    padding: 10px;
+    max-height: 160px;
+    overflow: auto;
+}
