@@ -1,1 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relational Query Optimizer</title>
+    <meta name="description" content="SQL Query Parser and Relational Algebra Optimizer with visual query plan tree">
 
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/tree.css') }}?v=2" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/graph.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/optimizer.css') }}" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #3730a3;
+            --surface: #f8fafc;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--surface);
+            color: var(--text);
+        }
+
+        /* ── Top bar ── */
+        .app-header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            padding: 20px 32px;
+            border-radius: 0 0 16px 16px;
+            margin-bottom: 28px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+        }
+
+        .app-header-icon {
+            font-size: 32px;
+            color: #818cf8;
+        }
+
+        .app-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+
+        .app-header p {
+            color: #94a3b8;
+            font-size: 0.82rem;
+            margin: 0;
+        }
+
+        /* ── Step nav ── */
+        .step-nav {
+            display: flex;
+            gap: 0;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+            background: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+
+        .nav-step {
+            flex: 1;
+            border: none;
+            border-right: 1px solid var(--border);
+            background: white;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 12px 8px;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            border-radius: 0;
+        }
+
+        .nav-step:last-child { border-right: none; }
+
+        .nav-step.active {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: white;
+        }
+
+        .nav-step:not(:disabled):hover {
+            background: #eef2ff;
+            color: var(--primary);
+        }
+
+        .nav-step:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* ── Panel card ── */
+        .panel-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+        }
+
+        /* ── SQL textarea ── */
+        #sql-input {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            resize: vertical;
+            min-height: 120px;
+            background: #f8fafc;
+            color: var(--text);
+            transition: border-color 0.2s;
+        }
+
+        #sql-input:focus {
+            border-color: #818cf8;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+            outline: none;
+            background: white;
+        }
+
+        /* ── Run button ── */
+        #run-parse {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            border: none;
+            color: white;
+            border-radius: 10px;
+            padding: 10px 24px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+            transition: all 0.2s;
+        }
+
+        #run-parse:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(79,70,229,0.4);
+        }
+
+        /* ── View mode tabs ── */
+        .view-tabs {
+            display: inline-flex;
+            gap: 4px;
+            background: #f1f5f9;
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 14px;
+        }
+
+        .view-mode {
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 7px;
+            transition: all 0.18s;
+        }
+
+        .view-mode.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+
+        /* ── Continue button ── */
+        #go-optimize {
+            background: linear-gradient(135deg, #059669, #10b981);
+            border: none;
+            border-radius: 10px;
+            padding: 10px 24px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(5,150,105,0.25);
+            transition: all 0.2s;
+        }
+
+        #go-optimize:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(5,150,105,0.35);
+        }
+
+        .stage-action {
+            background: linear-gradient(135deg, #059669, #10b981);
+            border: none;
+            color: white;
+            border-radius: 10px;
+            padding: 10px 24px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(5,150,105,0.25);
+            transition: all 0.2s;
+        }
+
+        .stage-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(5,150,105,0.35);
+        }
+
+        .stage-action.finish {
+            background: linear-gradient(135deg, #7c3aed, #ec4899);
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.28);
+        }
+
+        .stage-action.finish:hover {
+            box-shadow: 0 6px 18px rgba(168, 85, 247, 0.38);
+        }
+
+        .celebration-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 9999;
+        }
+
+        .celebration-piece {
+            position: absolute;
+            top: -20px;
+            width: 10px;
+            height: 18px;
+            border-radius: 999px;
+            opacity: 0.95;
+            animation: confetti-fall 1.7s ease-out forwards;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translate3d(0, 0, 0) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            100% {
+                transform: translate3d(var(--drift-x), 88vh, 0) rotate(var(--spin));
+                opacity: 0;
+            }
+        }
+
+        /* ── Info banners ── */
+        .stage-info {
+            background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+            border: 1px solid #c7d2fe;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            color: #3730a3;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        /* ── Code / JSON blocks ── */
+        pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.84rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            background: #ffffff;
+            color: #000000;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 16px;
+            overflow: auto;
+            max-height: 380px;
+        }
+
+        /* ── Tab panel visibility ── */
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+    </style>
+</head>
+
+<body>
+
+<div class="container-fluid px-3 px-md-4 py-0">
+
+    <!-- Header -->
+    <div class="app-header">
+        <span class="app-header-icon"><i class="bi bi-diagram-3-fill"></i></span>
+        <div>
+            <h1>SQL Query Optimizer</h1>
+            <p>Parse SQL → Visualize Relational Algebra → Optimize step by step</p>
+        </div>
+    </div>
+
+    <!-- Step navigation -->
+    <div class="step-nav">
+        <button class="nav-step active" id="step-parse"><i class="bi bi-code-slash me-1"></i>1. Parse</button>
+        <button class="nav-step" id="step-pushdown" disabled><i class="bi bi-arrow-down-circle me-1"></i>2. Predicate Pushdown</button>
+        <button class="nav-step" id="step-join" disabled><i class="bi bi-shuffle me-1"></i>3. Join Order</button>
+        <button class="nav-step" id="step-cse" disabled><i class="bi bi-lightning-charge me-1"></i>4. Common Subexpr</button>
+    </div>
+
+    <!-- ── PARSE panel ── -->
+    <div id="panel-parse" class="tab-pane active panel-card">
+
+        <h5 class="mb-3"><i class="bi bi-terminal me-2 text-indigo-600"></i>Enter SQL Query</h5>
+
+        <textarea id="sql-input" class="form-control mb-3"
+                  rows="5"
+                  placeholder="SELECT * FROM employees JOIN departments ON employees.dept_id = departments.id WHERE salary > 50000"></textarea>
+
+        <button id="run-parse" class="btn">
+            <i class="bi bi-play-fill me-1"></i> Run Analysis
+        </button>
+
+        <div id="parse-loading" class="mt-3 d-none d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary"></div>
+            <span class="text-muted" style="font-size:0.85rem">Parsing & optimizing…</span>
+        </div>
+
+        <div id="parse-error" class="alert alert-danger mt-3 d-none" style="border-radius:10px;font-size:0.85rem"></div>
+
+        <div id="parse-output" class="mt-4 d-none">
+
+            <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                <h5 class="mb-0">Query Plan Tree</h5>
+                <div class="view-tabs">
+                    <button class="view-mode" id="mode-json"><i class="bi bi-filetype-json me-1"></i>JSON</button>
+                    <button class="view-mode" id="mode-tree"><i class="bi bi-list-nested me-1"></i>Text Tree</button>
+                    <button class="view-mode active" id="mode-graph"><i class="bi bi-diagram-2 me-1"></i>Graph</button>
+                </div>
+            </div>
+
+            <div id="raw-view"  class="d-none"><pre id="raw-json"></pre></div>
+            <div id="json-view" class="d-none"></div>
+            <div id="tree-view" class="d-none"></div>
+            <div id="graph-view"></div>
+
+            <button id="go-optimize" class="btn btn-success mt-4 d-none">
+                Continue to Predicate Pushdown <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+
+        </div>
+    </div>
+
+    <!-- ── PUSHDOWN panel ── -->
+    <div id="panel-pushdown" class="tab-pane panel-card">
+        <h5><i class="bi bi-arrow-down-circle me-2"></i>Predicate Pushdown</h5>
+        <div class="stage-info">Filters (σ) are pushed as close to the base relations as possible to reduce intermediate tuple counts.</div>
+        <div id="pushdown-result"></div>
+        <div id="pushdown-loading" class="d-none mt-3 d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary"></div>
+            <span class="text-muted" style="font-size:0.85rem">Optimizing…</span>
+        </div>
+        <div id="pushdown-error" class="alert alert-danger d-none mt-3" style="border-radius:10px;font-size:0.85rem"></div>
+        <button id="go-join" class="stage-action mt-4 d-none">
+            Continue to Join Optimization <i class="bi bi-arrow-right ms-1"></i>
+        </button>
+    </div>
+
+    <!-- ── JOIN panel ── -->
+    <div id="panel-join" class="tab-pane panel-card">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <h5 class="mb-0"><i class="bi bi-shuffle me-2"></i>Join Order Optimization</h5>
+            <button onclick="runCostJoinOptimization()"
+                    style="background:linear-gradient(135deg,#0f766e,#14b8a6);border:none;color:white;
+                           border-radius:10px;padding:8px 18px;font-weight:600;font-size:0.82rem;
+                           box-shadow:0 4px 12px rgba(20,184,166,0.3);transition:all 0.2s;cursor:pointer;"
+                    onmouseover="this.style.transform='translateY(-1px)'"
+                    onmouseout="this.style.transform='none'">
+                <i class="bi bi-database-check me-1"></i> Run Cost-Based Optimizer (PostgreSQL)
+            </button>
+        </div>
+        <div class="stage-info">Heuristic: relations with more pushed-down filters are joined earlier. Cost-based: uses real PostgreSQL table statistics for optimal ordering.</div>
+        <div id="join-result"></div>
+        <div id="join-loading" class="d-none mt-3 d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary"></div>
+            <span class="text-muted" style="font-size:0.85rem">Optimizing join order…</span>
+        </div>
+        <div id="join-error" class="alert alert-danger d-none mt-3" style="border-radius:10px;font-size:0.85rem"></div>
+        <button id="go-cse" class="stage-action mt-4 d-none">
+            Continue to Common Subexpression Elimination <i class="bi bi-arrow-right ms-1"></i>
+        </button>
+    </div>
+
+    <!-- ── CSE panel ── -->
+    <div id="panel-cse" class="tab-pane panel-card">
+        <h5><i class="bi bi-lightning-charge me-2"></i>Common Subexpression Elimination</h5>
+        <div class="stage-info">Repeated subexpressions are identified so they can be computed once and reused.</div>
+        <div id="cse-result"></div>
+        <div id="cse-loading" class="d-none mt-3 d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary"></div>
+            <span class="text-muted" style="font-size:0.85rem">Scanning…</span>
+        </div>
+        <div id="cse-error" class="alert alert-danger d-none mt-3" style="border-radius:10px;font-size:0.85rem"></div>
+        <button id="finish-flow" class="stage-action finish mt-4 d-none">
+            Finish <i class="bi bi-stars ms-1"></i>
+        </button>
+    </div>
+
+    <div style="height:40px"></div>
+
+</div><!-- /container -->
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+<script src="{{ url_for('static', filename='js/tree.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/graph.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pushdown.js') }}"></script>
+<script src="{{ url_for('static', filename='js/join.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cse.js') }}"></script>
+
+<script>
+const demoQuery = `SELECT table_a.id, table_b.id
+FROM table_a
+JOIN table_b ON table_b.join_key_ab = table_a.join_key_ab
+JOIN table_c ON table_c.join_key_bc = table_b.join_key_ab
+WHERE table_b.id > 1`;
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const sqlBox = document.getElementById("sql-input");
+    sqlBox.value = demoQuery;
+
+    const graph = new RelationalAlgebraGraph(document.getElementById("graph-view"));
+    const tree  = new RelationalAlgebraTree(document.getElementById("tree-view"));
+    const viewMap = {
+        raw: "raw-view",
+        json: "json-view",
+        tree: "tree-view",
+        graph: "graph-view",
+    };
+    const modeButtons = Array.from(document.querySelectorAll(".view-mode"));
+
+    function setViewMode(mode) {
+        Object.entries(viewMap).forEach(([key, viewId]) => {
+            document.getElementById(viewId).classList.toggle("d-none", key !== mode);
+            const btn = document.getElementById(`mode-${key}`);
+            if (btn) btn.classList.toggle("active", key === mode);
+        });
+    }
+
+    modeButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const mode = btn.id.replace("mode-", "");
+            if (viewMap[mode]) setViewMode(mode);
+        });
+    });
+    setViewMode("graph");
+
+    document.getElementById("run-parse").onclick = () => {
+
+        const query = sqlBox.value.trim();
+        if (!query) return showError("Query cannot be empty");
+
+        toggle("parse-loading", true);
+        toggle("parse-output", false);
+        toggle("parse-error", false);
+
+        fetch("/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ sql_query: query })
+        })
+        .then(r => r.json())
+        .then(data => {
+
+            toggle("parse-loading", false);
+
+            if (!data.success) {
+                showError(data.error || "Parsing failed");
+                return;
+            }
+
+            const parsePlan = data.stages && data.stages.parse ? data.stages.parse.plan : null;
+            if (!parsePlan) {
+                showError("Analyze response missing parse stage");
+                return;
+            }
+
+            const pushStage = data.stages && data.stages.predicate_pushdown ? data.stages.predicate_pushdown : null;
+            const joinStage = data.stages && data.stages.join_optimization ? data.stages.join_optimization : null;
+            const cseStage  = data.stages && data.stages.cse ? data.stages.cse : null;
+
+            window.optimizerState = window.optimizerState || {};
+            window.optimizerState.parsedPlan = parsePlan;
+            window.optimizerState.pushedPlan = pushStage && pushStage.optimized_plan ? pushStage.optimized_plan : null;
+            window.optimizerState.joinedPlan = joinStage && joinStage.optimized_plan ? joinStage.optimized_plan : null;
+            window.optimizerState.csePlan    = cseStage  && cseStage.optimized_plan  ? cseStage.optimized_plan  : null;
+            window.optimizerState.stageData  = {
+                pushdown: pushStage,
+                join: joinStage,
+                cse: cseStage,
+            };
+
+            toggle("parse-output", true);
+
+            document.getElementById("raw-json").textContent = JSON.stringify(parsePlan, null, 2);
+
+            renderJson(parsePlan);
+            tree.render(parsePlan);
+            graph.render(parsePlan);
+            setViewMode("graph");
+
+            toggle("go-optimize", true);
+            toggle("go-join", false);
+            toggle("go-cse", false);
+            toggle("finish-flow", false);
+            document.getElementById("step-pushdown").disabled = false;
+            document.getElementById("step-join").disabled = true;
+            document.getElementById("step-cse").disabled = true;
+        })
+        .catch(e => {
+            toggle("parse-loading", false);
+            showError(e.message);
+        });
+    };
+
+    function toggle(id, show) {
+        document.getElementById(id).classList.toggle("d-none", !show);
+    }
+
+    function showError(msg) {
+        const el = document.getElementById("parse-error");
+        el.textContent = msg;
+        el.classList.remove("d-none");
+    }
+
+    function renderJson(data) {
+        const container = document.getElementById("json-view");
+        container.innerHTML = `<pre>${JSON.stringify(data,null,2)}</pre>`;
+    }
+
+    window.launchCelebration = function () {
+        const overlay = document.createElement("div");
+        overlay.className = "celebration-overlay";
+        const colors = ["#4f46e5", "#10b981", "#ec4899", "#f59e0b", "#0ea5e9"];
+
+        for (let i = 0; i < 32; i += 1) {
+            const piece = document.createElement("span");
+            piece.className = "celebration-piece";
+            piece.style.left = `${Math.random() * 100}%`;
+            piece.style.background = colors[i % colors.length];
+            piece.style.setProperty("--drift-x", `${(Math.random() - 0.5) * 180}px`);
+            piece.style.setProperty("--spin", `${(Math.random() - 0.5) * 720}deg`);
+            piece.style.animationDelay = `${Math.random() * 0.18}s`;
+            overlay.appendChild(piece);
+        }
+
+        document.body.appendChild(overlay);
+        window.setTimeout(() => overlay.remove(), 2200);
+    };
+
+});
+</script>
+
+</body>
+</html>
