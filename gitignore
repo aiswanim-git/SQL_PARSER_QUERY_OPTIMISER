@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Compiled parser artifacts
+parser/sql_parser
+parser/y.tab.c
+parser/y.tab.h
+parser/lex.yy.c
+parser/*.o
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Env files
+.env
