@@ -167,19 +167,34 @@ def _collect_join_conditions(node, conds):
         _collect_join_conditions(node.get('right'), conds)
 
 
-def _build_left_deep_join(arms, original_join_conditions=None):
-    if not arms:
+def _single_join_alias(node):
+    """Only reorder independently filtered base-table arms."""
+    tables = []
+    def visit(cur):
+        if not isinstance(cur, dict):
+            return
+        if cur.get('type') == 'base_relation':
+            tables.extend(cur.get('tables', []))
+        for key in ('input', 'left', 'right', 'query'):
+            visit(cur.get(key))
+    visit(node)
+    if len(tables) != 1:
         return None
-    cur = copy.deepcopy(arms[0])
-    original_join_conditions = original_join_conditions or {}
-    for index, nxt in enumerate(arms[1:]):
-        cur = {
-            'type': 'join',
-            'condition': original_join_conditions.get(index),
-            'left': cur,
-            'right': copy.deepcopy(nxt),
-        }
-    return cur
+    return tables[0].get('alias') or tables[0].get('name')
+
+
+def _join_condition_tables(condition):
+    """Return referenced aliases for a simple column-to-column join predicate."""
+    if not isinstance(condition, dict) or condition.get('type') not in ('EQ', 'LT', 'GT', 'LE', 'GE', 'NE'):
+        return None
+    left, right = condition.get('left'), condition.get('right')
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return None
+    if not (left.get('table') and left.get('attr') and right.get('table') and right.get('attr')):
+        return None
+    if right.get('type') not in (None, 'column'):
+        return None
+    return frozenset((left['table'], right['table']))
 
 
 def _simple_join_optimize(plan):
@@ -195,22 +210,47 @@ def _simple_join_optimize(plan):
     if len(arms) < 2:
         return copy.deepcopy(plan), {'note': 'no join tree found'}
 
-    scored = []
-    for arm in arms:
-        score = _count_filters(arm)
-        scored.append((score, arm))
-    scored.sort(key=lambda item: (-item[0], json.dumps(item[1], sort_keys=True)))
+    aliases = [_single_join_alias(arm) for arm in arms]
+    if any(alias is None for alias in aliases) or len(set(aliases)) != len(aliases):
+        return copy.deepcopy(plan), {'note': 'complex or ambiguous join arms: order preserved'}
 
-    ordered = [arm for _, arm in scored]
+    conditions = []
+    _collect_join_conditions(join_root, conditions)
+    condition_tables = [_join_condition_tables(cond) for cond in conditions]
+    if any(refs is None or len(refs) != 2 or not refs.issubset(set(aliases)) for refs in condition_tables):
+        return copy.deepcopy(plan), {'note': 'complex join predicates: order preserved'}
 
-    original_conds = []
-    _collect_join_conditions(join_root, original_conds)
-    cond_map = {idx: cond for idx, cond in enumerate(original_conds)}
+    scored = sorted(zip(aliases, arms), key=lambda item: (
+        -_count_filters(item[1]), json.dumps(item[1], sort_keys=True)
+    ))
 
-    optimized = _build_left_deep_join(ordered, cond_map)
-    optimized = _rewrap(optimized, outer_wrappers)
+    # Assign each predicate at the step where BOTH of its tables are present.
+    # Merely reattaching conditions by their original position can change SQL semantics.
+    first_alias, first_arm = scored[0]
+    current = copy.deepcopy(first_arm)
+    joined = {first_alias}
+    unused = list(zip(conditions, condition_tables))
+    for alias, arm in scored[1:]:
+        applicable = [(cond, refs) for cond, refs in unused if alias in refs and (refs - {alias}).issubset(joined)]
+        if not applicable:
+            return copy.deepcopy(plan), {'note': 'reorder would require a Cartesian join: order preserved'}
+        join_condition = copy.deepcopy(applicable[0][0])
+        for cond, _ in applicable[1:]:
+            join_condition = {'type': 'AND', 'left': join_condition, 'right': copy.deepcopy(cond)}
+        current = {
+            'type': 'join',
+            'condition': join_condition,
+            'left': current,
+            'right': copy.deepcopy(arm),
+        }
+        used_conditions = {id(cond) for cond, _ in applicable}
+        unused = [(cond, refs) for cond, refs in unused if id(cond) not in used_conditions]
+        joined.add(alias)
 
-    return optimized, {
+    if unused:
+        return copy.deepcopy(plan), {'note': 'unassigned join predicates: order preserved'}
+
+    return _rewrap(current, outer_wrappers), {
         'original_leaf_count': len(arms),
         'heuristic': 'relations with more pushed filters are joined earlier',
     }

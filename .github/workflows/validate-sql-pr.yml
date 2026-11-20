@@ -1,0 +1,29 @@
+name: Validate SQL optimizer PR
+on:
+  push:
+    branches:
+      - fix/cv-sql-optimizer-correctness
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parser and Python dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bison flex g++ graphviz
+          pip install -r web_rule/requirements.txt requests
+      - name: Build SQL parser
+        run: make -C parser
+      - name: Run optimizer regression tests
+        run: python -m unittest discover -s web_rule/tests -p 'test_cv_regressions.py' -v
+      - name: Run HTTP integration tests
+        run: python -m unittest discover -s web_rule/tests -p 'test_http_pipeline.py' -v

@@ -1,13 +1,15 @@
 import json
 
 class LogicalPlanNode:
-    def __init__(self, node_type, children=None, predicate=None, table=None, alias=None, columns=None):
+    def __init__(self, node_type, children=None, predicate=None, table=None, alias=None, columns=None, group_cols=None, having=None):
         self.node_type = node_type
         self.children = children or []
         self.predicate = predicate
         self.table = table
         self.alias = alias
         self.columns = columns or []
+        self.group_cols = group_cols
+        self.having = having
 
     def __str__(self, level=0):
         indent = '  ' * level
@@ -88,6 +90,9 @@ def build_logical_plan_from_json(obj):
     if ntype == 'base_relation':
         table_obj = obj['tables'][0]
         return LogicalPlanNode('SCAN', table=table_obj['name'], alias=table_obj.get('alias'))
+    if ntype == 'groupby':
+        child = build_logical_plan_from_json(obj['input'])
+        return LogicalPlanNode('GROUPBY', [child], group_cols=obj.get('group_cols', []), having=obj.get('having'))
     if ntype == 'subquery':
         child = build_logical_plan_from_json(obj['query'])
         return LogicalPlanNode('SUBQUERY', [child], table=obj.get('alias'), alias=obj.get('alias'))
@@ -128,6 +133,8 @@ def split_top_level_and(predicate):
 
 
 def find_table_in_subtree(node, table_name):
+    if node.node_type == 'SUBQUERY':
+        return False  # Outer aliases cannot be pushed through a subquery boundary.
     if node.node_type == 'SCAN':
         return node.table == table_name or node.alias == table_name
     return any(find_table_in_subtree(child, table_name) for child in node.children)
@@ -164,9 +171,8 @@ def predicate_pushdown(plan):
     child = plan.children[0]
     predicate = plan.predicate
 
-    if child.node_type == 'PROJECT':
-        child.children[0] = predicate_pushdown(LogicalPlanNode('FILTER', [child.children[0]], predicate=predicate))
-        return child
+    if child.node_type in ('PROJECT', 'GROUPBY', 'SUBQUERY'):
+        return plan  # Do not cross an unsafe semantic boundary.
 
     conditions = split_top_level_and(predicate) if ' AND ' in predicate else [predicate]
     residual = []
@@ -174,7 +180,7 @@ def predicate_pushdown(plan):
 
     for cond in conditions:
         refs = extract_table_references(cond)
-        if len(refs) == 1:
+        if len(refs) == 1 and find_table_in_subtree(result, next(iter(refs))):
             table_name = next(iter(refs))
             result = push_filter_to_scan(result, table_name, cond)
         else:
@@ -252,6 +258,8 @@ def logical_plan_to_json(plan):
         if plan.alias and plan.alias != plan.table:
             table['alias'] = plan.alias
         return {'type': 'base_relation', 'tables': [table]}
+    if plan.node_type == 'GROUPBY':
+        return {'type': 'groupby', 'group_cols': plan.group_cols, 'having': plan.having, 'input': logical_plan_to_json(plan.children[0])}
     if plan.node_type == 'SUBQUERY':
         return {'type': 'subquery', 'alias': plan.alias, 'query': logical_plan_to_json(plan.children[0])}
     raise ValueError(f'Unsupported node type: {plan.node_type}')
