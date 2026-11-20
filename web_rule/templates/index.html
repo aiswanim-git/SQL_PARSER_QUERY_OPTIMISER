@@ -379,10 +379,10 @@
                            box-shadow:0 4px 12px rgba(20,184,166,0.3);transition:all 0.2s;cursor:pointer;"
                     onmouseover="this.style.transform='translateY(-1px)'"
                     onmouseout="this.style.transform='none'">
-                <i class="bi bi-database-check me-1"></i> Run Cost-Based Optimizer (PostgreSQL)
+                <i class="bi bi-database-check me-1"></i> Run Simulated Cost-Based Optimizer
             </button>
         </div>
-        <div class="stage-info">Heuristic: relations with more pushed-down filters are joined earlier. Cost-based: uses real PostgreSQL table statistics for optimal ordering.</div>
+        <div class="stage-info">Heuristic: relations with more pushed-down filters are joined earlier. Cost-based demo: uses simulated table statistics and estimated CPU/I/O costs.</div>
         <div id="join-result"></div>
         <div id="join-loading" class="d-none mt-3 d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm text-primary"></div>
