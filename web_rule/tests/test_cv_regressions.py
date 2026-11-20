@@ -53,15 +53,18 @@ def join_table_sets(node):
 
 class OptimizationRegressions(unittest.TestCase):
     def test_join_conditions_follow_reordered_tables(self):
-        # Original order: ((A join B) join C); filter on C makes C attractive first.
-        original = join(join(table('A'), table('B'), eq('A', 'B')),
-                        {'type': 'select', 'condition': {
-                            'type': 'GT',
-                            'left': {'table': 'C', 'attr': 'value'},
-                            'right': {'type': 'int', 'value': 1},
-                        }, 'input': table('C')}, eq('B', 'C'))
+        # Original order: ((A join B) join C); a filter on B moves B first.
+        # Incorrect positional condition assignment would attach B=C to B join A.
+        filtered_b = {'type': 'select', 'condition': {
+            'type': 'GT',
+            'left': {'table': 'B', 'attr': 'value'},
+            'right': {'type': 'int', 'value': 1},
+        }, 'input': table('B')}
+        original = join(join(table('A'), filtered_b, eq('A', 'B')),
+                        table('C'), eq('B', 'C'))
         result, _ = _simple_join_optimize(copy.deepcopy(original))
         self.assertEqual(join_table_sets(result), {'A', 'B', 'C'})
+        self.assertEqual(result['left']['left']['input']['tables'][0]['name'], 'B')
 
     def test_complex_join_predicate_falls_back(self):
         original = join(table('A'), table('B'), {
