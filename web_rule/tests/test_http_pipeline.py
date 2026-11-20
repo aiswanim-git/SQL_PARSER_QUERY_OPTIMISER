@@ -57,6 +57,22 @@ class HTTPPipelineTests(unittest.TestCase):
         self.assertIsInstance(result.get('naive_cost'), (float, int))
         self.assertIsInstance(result.get('best_cost'), (float, int))
 
+    def test_existing_proof_queries(self):
+        from run_proof_queries import QUERIES
+        # The existing nested-subquery demo uses unqualified columns, outside
+        # the parser's documented grammar; check the supported examples here.
+        for name, query in QUERIES.items():
+            if name == 'q6_nested_subquery':
+                continue
+            with self.subTest(name=name):
+                data = self.analyze(query)
+                if 'should_reject' in name or 'should_error' in name:
+                    self.assertFalse(data.get('success'), (name, data))
+                else:
+                    self.assertTrue(data.get('success'), (name, data))
+                    for stage in ('predicate_pushdown', 'join_optimization', 'cse'):
+                        self.assertEqual(data['stages'][stage]['status'], 'success', (name, stage, data))
+
     def test_invalid_sql_returns_failure(self):
         data = self.analyze('SELEC A.id FORM employee A')
         self.assertFalse(data.get('success'), data)
