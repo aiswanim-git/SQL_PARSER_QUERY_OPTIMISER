@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y bison flex g++ graphviz
-          pip install -r web_rule/requirements.txt
+          pip install -r web_rule/requirements.txt requests
       - name: Build SQL parser
         run: make -C parser
       - name: Run optimizer regression tests
