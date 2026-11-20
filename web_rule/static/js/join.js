@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : '—';
 
             metricBox.innerHTML = `
-                <b>Exhaustive Actual Optimization</b><br>
+                <b>Exhaustive Modeled-Cost Optimization</b><br>
                 Naive: <code>${naive}</code> &nbsp;→&nbsp; Optimized: <code>${best}</code>${scale}
                 <hr class="my-2">
                 <b>Selected Plan</b><br>
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const exhaustiveBestCost = Number.isFinite(stage.best_cost) ? stage.best_cost.toFixed(2) : '—';
                 const exhaustiveOrder = Array.isArray(stage.selected_order) ? stage.selected_order.join(' → ') : '—';
                 const exhaustiveStrategies = Array.isArray(stage.selected_strategies) ? stage.selected_strategies.join(', ') : '—';
-                const exhaustiveRow = `<li><b>exhaustive_actual</b>: actual <code>${exhaustiveBestCost}</code> <b>(global best)</b><br><small>order: ${exhaustiveOrder} | strategies: ${exhaustiveStrategies}</small></li>`;
+                const exhaustiveRow = `<li><b>exhaustive_model</b>: modeled <code>${exhaustiveBestCost}</code> <b>(global best)</b><br><small>order: ${exhaustiveOrder} | strategies: ${exhaustiveStrategies}</small></li>`;
 
                 const methodRows = sortedMethods
                     .map(([method, info]) => {
@@ -143,12 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         const strategies = Array.isArray(info.strategies) ? info.strategies.join(', ') : '—';
                         const mark = method === bestActualMethod ? ' <b>(most optimized)</b>' : '';
                         const err = info.error ? `<br><small class="text-danger">error: ${info.error}</small>` : '';
-                        return `<li><b>${method}</b>: actual <code>${actual}</code>${mark}, estimated <code>${estimated}</code><br><small>order: ${order} | strategies: ${strategies}</small>${err}</li>`;
+                        return `<li><b>${method}</b>: modeled <code>${actual}</code>${mark}, estimated <code>${estimated}</code><br><small>order: ${order} | strategies: ${strategies}</small>${err}</li>`;
                     })
                     .join('');
 
                 actualBox.innerHTML = `
-                    <b>Method Actual Cost Comparison</b><br>
+                    <b>Modeled Cost Comparison</b><br>
                     <small>Method rows are method-selected candidates (fixed/ndv/mcv), sorted by actual cost. Best among method-selected: <code>${bestActualMethod}</code> (<code>${bestActualCost}</code>).</small>
                     <ul class="mt-2 mb-0">${exhaustiveRow}${methodRows}</ul>
                 `;
