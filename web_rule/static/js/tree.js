@@ -12,6 +12,8 @@ class RelationalAlgebraTree {
     }
 
     render(data) {
+        // CSE returns {query, common_expressions, metadata}; show its query tree.
+        if (data && data.query && !data.type) data = data.query;
         this.container.innerHTML = '';
         const root = document.createElement('ul');
         root.className = 'tree';
